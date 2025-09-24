@@ -128,7 +128,6 @@ main {
 }
 
 .like-btn:hover, .reply-btn:hover { transform:scale(1.2); }
-
 .like-btn:active, .reply-btn:active { transform:scale(1.4); }
 
 .reply-section textarea {
@@ -178,6 +177,7 @@ main {
 </style>
 </head>
 <body>
+
 <header>
   <h1>Anonymous Confession Wall</h1>
   <p>Share your secrets. Read what others confess.</p>
@@ -194,18 +194,40 @@ main {
   <section class="confession-feed" id="confessionFeed"></section>
 </main>
 
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
 <script>
+// Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSyBfh-9g09MNFRJge4UCovRs9b02azXI34U",
+  authDomain: "anonymous-confession-wall.firebaseapp.com",
+  projectId: "anonymous-confession-wall",
+  storageBucket: "anonymous-confession-wall.firebasestorage.app",
+  messagingSenderId: "879272261972",
+  appId: "1:879272261972:web:2d6d05df78defe6f2a70c1",
+  measurementId: "G-6HW8ZB0SR4"
+};
+
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// DOM Elements
 const postBtn = document.getElementById('postBtn');
 const confessionInput = document.getElementById('confessionInput');
 const confessionFeed = document.getElementById('confessionFeed');
 const charCount = document.getElementById('charCount');
 
+// Character counter
 confessionInput.addEventListener('input', () => {
   const length = confessionInput.value.length;
   charCount.textContent = `${length} / 300`;
 });
 
-function createConfession(text){
+// Create confession card
+function createConfession(text, id=null, likesCount=0, repliesArray=[], timestamp=null){
   const card = document.createElement('div');
   card.classList.add('confession-card');
 
@@ -215,19 +237,19 @@ function createConfession(text){
   const meta = document.createElement('div');
   meta.classList.add('confession-meta');
 
-  // Timestamp
   const time = document.createElement('span');
-  const now = new Date();
-  time.textContent = now.toLocaleString();
+  time.textContent = timestamp ? new Date(timestamp.seconds*1000).toLocaleString() : new Date().toLocaleString();
 
-  // Like button
   const likeBtn = document.createElement('button');
   likeBtn.classList.add('like-btn');
-  likeBtn.textContent = "❤️ 0";
-  let likes=0;
-  likeBtn.addEventListener('click', ()=>{ likes++; likeBtn.textContent=`❤️ ${likes}`; });
+  let likes = likesCount;
+  likeBtn.textContent = `❤️ ${likes}`;
+  likeBtn.addEventListener('click', () => {
+    likes++;
+    likeBtn.textContent = `❤️ ${likes}`;
+    if(id) db.collection("confessions").doc(id).update({likes: likes});
+  });
 
-  // Reply button
   const replyBtn = document.createElement('button');
   replyBtn.classList.add('reply-btn');
   replyBtn.textContent = "Reply";
@@ -246,6 +268,14 @@ function createConfession(text){
   const repliesDiv = document.createElement('div');
   repliesDiv.classList.add('replies');
 
+  if(repliesArray.length){
+    repliesArray.forEach(r => {
+      const replyP = document.createElement('p');
+      replyP.textContent = r;
+      repliesDiv.appendChild(replyP);
+    });
+  }
+
   replySection.appendChild(replyTextarea);
   replySection.appendChild(postReplyBtn);
   replySection.appendChild(repliesDiv);
@@ -256,7 +286,10 @@ function createConfession(text){
 
   postReplyBtn.addEventListener('click', ()=>{
     const replyText = replyTextarea.value.trim();
-    if(replyText){
+    if(replyText && id){
+      db.collection("confessions").doc(id).update({
+        replies: firebase.firestore.FieldValue.arrayUnion(replyText)
+      });
       const replyP = document.createElement('p');
       replyP.textContent = replyText;
       repliesDiv.appendChild(replyP);
@@ -276,15 +309,33 @@ function createConfession(text){
   card.scrollIntoView({behavior:"smooth", block:"start"});
 }
 
-postBtn.addEventListener('click', ()=>{
+// Post confession
+postBtn.addEventListener('click', () => {
   const text = confessionInput.value.trim();
   if(text){
-    createConfession(text);
-    confessionInput.value="";
-    charCount.textContent="0 / 300";
+    db.collection("confessions").add({
+      text: text,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      likes: 0,
+      replies: []
+    })
+    .then(() => {
+      confessionInput.value="";
+      charCount.textContent="0 / 300";
+    })
+    .catch(error => { console.error("Error adding confession: ", error); });
   } else {
     alert("Please write something before posting!");
   }
+});
+
+// Load confessions in real-time
+db.collection("confessions").orderBy("timestamp","desc").onSnapshot(snapshot => {
+  confessionFeed.innerHTML = "";
+  snapshot.forEach(doc => {
+    const data = doc.data();
+    createConfession(data.text, doc.id, data.likes, data.replies, data.timestamp);
+  });
 });
 </script>
 </body>
