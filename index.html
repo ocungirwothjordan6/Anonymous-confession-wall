@@ -212,7 +212,7 @@ const firebaseConfig = {
 
 // Initialize Firebase
 firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+const db = firebase.firestore(anonymous-confession-wall.firebasestorage.app);
 
 // DOM Elements
 const postBtn = document.getElementById('postBtn');
