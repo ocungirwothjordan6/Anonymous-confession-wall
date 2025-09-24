@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anonymous Confession Wall</title>
+<style>
+/* --- Reset --- */
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family: 'Poppins', sans-serif;
+  background: linear-gradient(135deg, #1f1f1f, #2d2d2d);
+  color: #eee;
+  min-height: 100vh;
+  display:flex;
+  flex-direction:column;
+}
+
+header {
+  text-align:center;
+  padding:2rem 1rem;
+  background:#111;
+  border-bottom:2px solid #444;
+}
+
+header h1 {
+  font-size:2.2rem;
+  margin-bottom:0.5rem;
+  color:#ff4d6d;
+}
+
+header p { font-size:1rem; color:#aaa; }
+
+main {
+  flex:1;
+  padding:2rem 1rem;
+  max-width:800px;
+  margin:auto;
+  width:100%;
+}
+
+.confession-form {
+  background:#222;
+  padding:1.5rem;
+  border-radius:12px;
+  box-shadow:0 4px 10px rgba(0,0,0,0.4);
+  margin-bottom:2rem;
+  animation:fadeIn 0.7s ease;
+}
+
+.confession-form h2 { margin-bottom:1rem; color:#ff758c; }
+
+.confession-form textarea {
+  width:100%;
+  padding:1rem;
+  border-radius:8px;
+  border:none;
+  outline:none;
+  resize:none;
+  font-size:1rem;
+  background:#333;
+  color:#fff;
+  transition:background 0.3s;
+}
+
+.confession-form textarea:focus { background:#444; }
+
+.confession-form button {
+  margin-top:1rem;
+  padding:0.8rem 1.2rem;
+  background:linear-gradient(45deg,#ff4d6d,#ff758c);
+  color:#fff;
+  border:none;
+  border-radius:8px;
+  font-size:1rem;
+  cursor:pointer;
+  transition: transform 0.2s, opacity 0.2s;
+}
+
+.confession-form button:hover {
+  transform: scale(1.05);
+  opacity:0.9;
+}
+
+#charCount { color:#aaa; font-size:0.9rem; margin-top:5px; }
+
+.confession-feed { display:flex; flex-direction:column; gap:1.2rem; }
+
+.confession-card {
+  background:#2b2b2b;
+  padding:1.2rem;
+  border-radius:12px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.5);
+  animation:slideUp 0.5s ease;
+  position:relative;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.confession-card:hover {
+  transform:translateY(-5px);
+  box-shadow:0 6px 20px rgba(255,77,109,0.4);
+}
+
+.confession-card p {
+  font-size:1rem;
+  line-height:1.4;
+  color:#ddd;
+  margin-bottom:0.5rem;
+}
+
+.confession-meta {
+  font-size:0.8rem;
+  color:#aaa;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+.like-btn, .reply-btn {
+  background:transparent;
+  border:none;
+  color:#ff4d6d;
+  cursor:pointer;
+  font-size:0.9rem;
+  margin-left:5px;
+  transition: transform 0.2s;
+}
+
+.like-btn:hover, .reply-btn:hover { transform:scale(1.2); }
+
+.like-btn:active, .reply-btn:active { transform:scale(1.4); }
+
+.reply-section textarea {
+  width:100%;
+  padding:0.5rem;
+  margin-top:5px;
+  border-radius:6px;
+  border:none;
+  background:#333;
+  color:#fff;
+  resize:none;
+}
+
+.reply-section button {
+  margin-top:5px;
+  padding:0.5rem 0.8rem;
+  background:linear-gradient(45deg,#ff4d6d,#ff758c);
+  color:#fff;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+  font-size:0.85rem;
+}
+
+.reply-section button:hover { opacity:0.9; }
+
+.replies p {
+  margin-left:10px;
+  background:#333;
+  padding:5px;
+  border-radius:5px;
+  margin-top:5px;
+  font-size:0.9rem;
+  word-wrap:break-word;
+}
+
+/* Animations */
+@keyframes fadeIn { from {opacity:0; transform:scale(0.95);} to {opacity:1; transform:scale(1);} }
+@keyframes slideUp { from {opacity:0; transform:translateY(20px);} to {opacity:1; transform:translateY(0);} }
+
+/* Responsive */
+@media(max-width:500px){
+  main { padding:1rem; }
+  .confession-form textarea, .reply-section textarea { font-size:0.9rem; }
+  .confession-card p, .replies p { font-size:0.9rem; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Anonymous Confession Wall</h1>
+  <p>Share your secrets. Read what others confess.</p>
+</header>
+
+<main>
+  <section class="confession-form">
+    <h2>Post Confession</h2>
+    <textarea id="confessionInput" rows="4" placeholder="What's on your mind?" maxlength="300"></textarea>
+    <p id="charCount">0 / 300</p>
+    <button id="postBtn">Post your confession</button>
+  </section>
+
+  <section class="confession-feed" id="confessionFeed"></section>
+</main>
+
+<script>
+const postBtn = document.getElementById('postBtn');
+const confessionInput = document.getElementById('confessionInput');
+const confessionFeed = document.getElementById('confessionFeed');
+const charCount = document.getElementById('charCount');
+
+confessionInput.addEventListener('input', () => {
+  const length = confessionInput.value.length;
+  charCount.textContent = `${length} / 300`;
+});
+
+function createConfession(text){
+  const card = document.createElement('div');
+  card.classList.add('confession-card');
+
+  const confessionText = document.createElement('p');
+  confessionText.textContent = text;
+
+  const meta = document.createElement('div');
+  meta.classList.add('confession-meta');
+
+  // Timestamp
+  const time = document.createElement('span');
+  const now = new Date();
+  time.textContent = now.toLocaleString();
+
+  // Like button
+  const likeBtn = document.createElement('button');
+  likeBtn.classList.add('like-btn');
+  likeBtn.textContent = "❤️ 0";
+  let likes=0;
+  likeBtn.addEventListener('click', ()=>{ likes++; likeBtn.textContent=`❤️ ${likes}`; });
+
+  // Reply button
+  const replyBtn = document.createElement('button');
+  replyBtn.classList.add('reply-btn');
+  replyBtn.textContent = "Reply";
+
+  const replySection = document.createElement('div');
+  replySection.classList.add('reply-section');
+  replySection.style.display="none";
+
+  const replyTextarea = document.createElement('textarea');
+  replyTextarea.rows=2;
+  replyTextarea.placeholder="Write a reply...";
+
+  const postReplyBtn = document.createElement('button');
+  postReplyBtn.textContent="Post Reply";
+
+  const repliesDiv = document.createElement('div');
+  repliesDiv.classList.add('replies');
+
+  replySection.appendChild(replyTextarea);
+  replySection.appendChild(postReplyBtn);
+  replySection.appendChild(repliesDiv);
+
+  replyBtn.addEventListener('click', ()=>{
+    replySection.style.display = replySection.style.display==="none" ? "block" : "none";
+  });
+
+  postReplyBtn.addEventListener('click', ()=>{
+    const replyText = replyTextarea.value.trim();
+    if(replyText){
+      const replyP = document.createElement('p');
+      replyP.textContent = replyText;
+      repliesDiv.appendChild(replyP);
+      replyTextarea.value="";
+    }
+  });
+
+  meta.appendChild(time);
+  meta.appendChild(likeBtn);
+  meta.appendChild(replyBtn);
+
+  card.appendChild(confessionText);
+  card.appendChild(meta);
+  card.appendChild(replySection);
+
+  confessionFeed.prepend(card);
+  card.scrollIntoView({behavior:"smooth", block:"start"});
+}
+
+postBtn.addEventListener('click', ()=>{
+  const text = confessionInput.value.trim();
+  if(text){
+    createConfession(text);
+    confessionInput.value="";
+    charCount.textContent="0 / 300";
+  } else {
+    alert("Please write something before posting!");
+  }
+});
+</script>
+</body>
+</html>
